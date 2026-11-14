@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  seeker
+  admin
+}
+
+enum AlertMode {
+  instant
+  digest
+  both
+  off
+}
+
+enum Tier {
+  free
+  premium
+}
+
+enum ExperienceLevel {
+  student
+  intern
+  junior
+  mid
+  senior
+  any
+}
+
+enum JobType {
+  full_time
+  part_time
+  contract
+  internship
+  freelance
+  unknown
+}
+
+enum RemoteMode {
+  remote
+  onsite
+  hybrid
+  unknown
+}
+
+enum SourceKind {
+  sample
+  web
+  telegram
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  failed
+  cancelled
+}
+
+model User {
+  id               String    @id @default(cuid())
+  telegramId       String?   @unique
+  telegramUsername String?
+  firstName        String?
+  lastName         String?
+  email            String?   @unique
+  locale           String    @default("en")
+  alertMode        AlertMode @default(both)
+  tier             Tier      @default(free)
+  role             UserRole  @default(seeker)
+  premiumUntil     DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  profile          Profile?
+  matches          Match[]
+  payments         Payment[]
+}
+
+model Profile {
+  id              String          @id @default(cuid())
+  userId          String          @unique
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName        String?
+  headline        String?
+  field           String?
+  skills          String[]
+  experienceLevel ExperienceLevel @default(junior)
+  yearsExperience Int?
+  preferredCities String[]
+  remoteOk        Boolean         @default(true)
+  jobTypes        JobType[]
+  education       String?
+  summary         String?
+  phone           String?
+  rawCvText       String?         @db.Text
+  cvFileName      String?
+  embedding       Json?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model Source {
+  id         String      @id @default(cuid())
+  key        String      @unique
+  name       String
+  kind       SourceKind
+  config     Json
+  enabled    Boolean     @default(true)
+  lastRunAt  DateTime?
+  lastStatus String?
+  lastError  String?     @db.Text
+  createdAt  DateTime    @default(now())
+  jobs       Job[]
+  runs       IngestRun[]
+}
+
+model Job {
+  id              String          @id @default(cuid())
+  sourceId        String
+  source          Source          @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  externalId      String
+  fingerprint     String
+  title           String
+  company         String?
+  location        String?
+  city            String?
+  remote          RemoteMode      @default(unknown)
+  jobType         JobType         @default(unknown)
+  experienceLevel ExperienceLevel @default(any)
+  deadline        DateTime?
+  description     String          @db.Text
+  howToApply      String?         @db.Text
+  applyUrl        String?
+  sourceUrl       String
+  postedAt        DateTime?
+  rawText         String          @db.Text
+  language        String          @default("en")
+  skills          String[]
+  seenOn          String[]
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  matches         Match[]
+
+  @@unique([sourceId, externalId])
+  @@index([fingerprint])
+  @@index([isActive, postedAt])
+  @@index([city])
+  @@index([deadline])
+}
+
+model Match {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobId         String
+  job           Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  score         Float
+  ruleScore     Float
+  embedScore    Float
+  reasons       String[]
+  whyLine       String
+  whyLineAm     String
+  matchedSkills String[]
+  alertedAt     DateTime?
+  digestSentAt  DateTime?
+  saved         Boolean  @default(false)
+  dismissed     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, jobId])
+  @@index([userId, dismissed, score])
+}
+
+model Payment {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider    String
+  amountEtb   Int
+  plan        String
+  status      PaymentStatus @default(pending)
+  reference   String        @unique
+  checkoutUrl String?
+  metadata    Json?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model IngestRun {
+  id         String    @id @default(cuid())
+  sourceId   String
+  source     Source    @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  found      Int       @default(0)
+  created    Int       @default(0)
+  updated    Int       @default(0)
+  duplicates Int       @default(0)
+  error      String?   @db.Text
+}

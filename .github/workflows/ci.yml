@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: sera
+          POSTGRES_PASSWORD: sera
+          POSTGRES_DB: sera
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sera -d sera"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://sera:sera@localhost:5432/sera
+      SESSION_SECRET: ci-session-secret-must-be-32-characters
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3847
+      DEMO_MODE: "true"
+      PAYMENT_PROVIDER: stub
+      CRON_SECRET: ci-cron-secret-not-used-for-charges
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma migrate deploy
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

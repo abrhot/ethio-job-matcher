@@ -1,0 +1,20 @@
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  serverExternalPackages: ["unpdf", "mammoth", "@prisma/client"],
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "4mb",
+    },
+  },
+  turbopack: {
+    rules: {
+      "*.css": {
+        loaders: ["@tailwindcss/turbopack"],
+        as: "*.css",
+      },
+    },
+  },
+};
+
+export default nextConfig;
